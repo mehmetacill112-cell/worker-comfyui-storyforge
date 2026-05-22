@@ -1,4 +1,4 @@
-FROM runpod/worker-comfyui:5.8.5-base
+FROM runpod/worker-comfyui:5.8.5-base-cuda12.8.1
 
 # VideoHelperSuite provides VHS_VideoCombine, which writes mp4s under node_output["gifs"].
 # LTXVideo plugin is kept in case future workflows want LTXVTiledVAEDecode etc.;
@@ -28,3 +28,29 @@ else:
     open(p, 'w').write(new)
     print('handler.py patched: gifs aliased to images')
 PY
+
+# pre_start.sh is called by /start.sh before ComfyUI launches.
+# Downloads lh_pixar_3d_style LoRA to the network volume if missing.
+# Set CIVITAI_TOKEN env var in RunPod endpoint settings if download fails.
+RUN printf '#!/usr/bin/env bash\n\
+LORA_DIR="/workspace/models/loras"\n\
+LORA_FILE="${LORA_DIR}/lh_pixar_3d_style.safetensors"\n\
+CIVITAI_URL="https://civitai.com/api/download/models/2591917"\n\
+if [ ! -f "${LORA_FILE}" ]; then\n\
+    echo "[pre_start] Downloading lh_pixar_3d_style LoRA..."\n\
+    mkdir -p "${LORA_DIR}"\n\
+    if [ -n "${CIVITAI_TOKEN}" ]; then\n\
+        wget -q --header="Authorization: Bearer ${CIVITAI_TOKEN}" "${CIVITAI_URL}" -O "${LORA_FILE}" || true\n\
+    else\n\
+        wget -q "${CIVITAI_URL}" -O "${LORA_FILE}" || true\n\
+    fi\n\
+    SZ=$(stat -c%%s "${LORA_FILE}" 2>/dev/null || echo 0)\n\
+    if [ "${SZ}" -lt 1048576 ]; then\n\
+        echo "[pre_start] WARNING: LoRA too small (${SZ}B). Set CIVITAI_TOKEN env var."\n\
+        rm -f "${LORA_FILE}"\n\
+    else\n\
+        echo "[pre_start] LoRA downloaded OK (${SZ}B)"\n\
+    fi\n\
+else\n\
+    echo "[pre_start] lh_pixar_3d_style.safetensors present, skipping."\n\
+fi\n' > /pre_start.sh && chmod +x /pre_start.sh
