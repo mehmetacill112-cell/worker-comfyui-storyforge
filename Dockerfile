@@ -5,8 +5,10 @@ FROM runpod/worker-comfyui:5.8.5-base
 # core ComfyUI already ships LTXVImgToVideo / LTXVConditioning / LTXVScheduler.
 RUN git clone --depth 1 https://github.com/Lightricks/ComfyUI-LTXVideo /comfyui/custom_nodes/ComfyUI-LTXVideo \
  && git clone --depth 1 https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite /comfyui/custom_nodes/ComfyUI-VideoHelperSuite \
+ && git clone --depth 1 https://github.com/Shakker-Labs/ComfyUI-IPAdapter-Flux /comfyui/custom_nodes/ComfyUI-IPAdapter-Flux \
  && pip install --no-cache-dir -r /comfyui/custom_nodes/ComfyUI-LTXVideo/requirements.txt \
- && pip install --no-cache-dir -r /comfyui/custom_nodes/ComfyUI-VideoHelperSuite/requirements.txt
+ && pip install --no-cache-dir -r /comfyui/custom_nodes/ComfyUI-VideoHelperSuite/requirements.txt \
+ && pip install --no-cache-dir -r /comfyui/custom_nodes/ComfyUI-IPAdapter-Flux/requirements.txt
 
 # Patch worker-comfyui handler.py to alias node_output["gifs"] → node_output["images"]
 # so VHS_VideoCombine mp4 outputs surface in the response. Upstream PR #133 covers
