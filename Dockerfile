@@ -11,16 +11,26 @@ RUN git clone --depth 1 https://github.com/Lightricks/ComfyUI-LTXVideo /comfyui/
  && pip install --no-cache-dir -r /comfyui/custom_nodes/ComfyUI-IPAdapter-Flux/requirements.txt
 
 # Register ipadapter-flux in extra_model_paths.yaml so the IPAdapterFluxLoader
-# custom node can find ip-adapter.bin on the network volume. Base image already
-# maps clip_vision + loras + checkpoints under base_path /runpod-volume but
-# NOT ipadapter-flux (it's not a stock ComfyUI dir). We write our OWN config
-# file under /comfyui/ — ComfyUI will load all *.yaml in extra_model_paths
-# locations OR we explicitly pass --extra-model-paths-config.
-RUN printf 'storyforge_extra:\n  base_path: /runpod-volume\n  ipadapter-flux: models/ipadapter-flux/\n' > /comfyui/extra_model_paths_storyforge.yaml && \
-    cat /comfyui/extra_model_paths.yaml /comfyui/extra_model_paths_storyforge.yaml > /tmp/merged.yaml && \
-    mv /tmp/merged.yaml /comfyui/extra_model_paths.yaml && \
-    echo "=== extra_model_paths.yaml after merge ===" && \
-    cat /comfyui/extra_model_paths.yaml
+# custom node can find ip-adapter.bin on the network volume.
+#
+# Defensive: register under BOTH /workspace and /runpod-volume because:
+#   - Endpoint template says volumeMountPath=/workspace (Hetzner side)
+#   - Base image extra_model_paths.yaml uses /runpod-volume (worker side)
+#   - xtts + wav2lip handlers reference /runpod-volume
+# Both paths point to the same network volume z0jl8dbtgo (one is a symlink).
+# ComfyUI's folder_paths supports multiple base_paths per filename type —
+# whichever resolves first wins.
+RUN cat >> /comfyui/extra_model_paths.yaml <<'YAML_APPEND'
+
+storyforge_ipa_workspace:
+  base_path: /workspace
+  ipadapter-flux: models/ipadapter-flux/
+
+storyforge_ipa_runpodvolume:
+  base_path: /runpod-volume
+  ipadapter-flux: models/ipadapter-flux/
+YAML_APPEND
+RUN echo "=== extra_model_paths.yaml after append ===" && cat /comfyui/extra_model_paths.yaml
 
 # Patch worker-comfyui handler.py to alias node_output["gifs"] → node_output["images"]
 # so VHS_VideoCombine mp4 outputs surface in the response. Upstream PR #133 covers
