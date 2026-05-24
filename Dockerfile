@@ -10,27 +10,31 @@ RUN git clone --depth 1 https://github.com/Lightricks/ComfyUI-LTXVideo /comfyui/
  && pip install --no-cache-dir -r /comfyui/custom_nodes/ComfyUI-VideoHelperSuite/requirements.txt \
  && pip install --no-cache-dir -r /comfyui/custom_nodes/ComfyUI-IPAdapter-Flux/requirements.txt
 
-# Register ipadapter-flux in extra_model_paths.yaml so the IPAdapterFluxLoader
-# custom node can find ip-adapter.bin on the network volume.
+# Build-time symlinks: /comfyui/models/{ipadapter-flux,clip_vision} -> /runpod-volume/models/
 #
-# Defensive: register under BOTH /workspace and /runpod-volume because:
-#   - Endpoint template says volumeMountPath=/workspace (Hetzner side)
-#   - Base image extra_model_paths.yaml uses /runpod-volume (worker side)
-#   - xtts + wav2lip handlers reference /runpod-volume
-# Both paths point to the same network volume z0jl8dbtgo (one is a symlink).
-# ComfyUI's folder_paths supports multiple base_paths per filename type —
-# whichever resolves first wins.
-RUN cat >> /comfyui/extra_model_paths.yaml <<'YAML_APPEND'
-
-storyforge_ipa_workspace:
-  base_path: /workspace
-  ipadapter-flux: models/ipadapter-flux/
+# Debug pod confirmed (2026-05-24 18:04 UTC):
+#   - /comfyui/models/ipadapter-flux DOES NOT EXIST on worker
+#   - /runpod-volume/models/ipadapter-flux/ip-adapter.bin EXISTS (5.0 GB)
+#   - folder_paths.models_dir = /comfyui/models (ComfyUI default)
+#   - Custom node ComfyUI-IPAdapter-Flux registers folder_paths.models_dir + "ipadapter-flux"
+#
+# Symlink at build time, target resolves at runtime when network volume mounts
+# at /runpod-volume (base image yaml + xtts/wav2lip handlers all use this path).
+# Also keep extra_model_paths registration as belt+suspenders.
+RUN mkdir -p /runpod-volume/models/ipadapter-flux /runpod-volume/models/clip_vision \
+ && ln -sfn /runpod-volume/models/ipadapter-flux /comfyui/models/ipadapter-flux \
+ && ln -sfn /runpod-volume/models/clip_vision /comfyui/models/clip_vision \
+ && cat >> /comfyui/extra_model_paths.yaml <<'YAML_APPEND'
 
 storyforge_ipa_runpodvolume:
   base_path: /runpod-volume
   ipadapter-flux: models/ipadapter-flux/
 YAML_APPEND
-RUN echo "=== extra_model_paths.yaml after append ===" && cat /comfyui/extra_model_paths.yaml
+
+RUN echo "=== Final symlinks + yaml state ===" \
+ && ls -la /comfyui/models/ipadapter-flux /comfyui/models/clip_vision \
+ && echo "---" \
+ && cat /comfyui/extra_model_paths.yaml
 
 # Patch worker-comfyui handler.py to alias node_output["gifs"] → node_output["images"]
 # so VHS_VideoCombine mp4 outputs surface in the response. Upstream PR #133 covers
