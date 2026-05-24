@@ -1,5 +1,14 @@
 FROM runpod/worker-comfyui:5.8.5-base
 
+# FIX H (2026-05-24): force transformers + HuggingFace Hub into offline mode.
+# All models are pre-staged on network volume — no need for HF online checks.
+# Saves ~10-15s per render (1-2s per IP-Adapter load × 10 beats) and avoids
+# HF rate-limit risk on busy days. Confirmed via user-downloaded worker logs
+# showing repeated HEAD requests to huggingface.co/google/siglip-so400m-patch14-384.
+ENV TRANSFORMERS_OFFLINE=1
+ENV HF_HUB_OFFLINE=1
+ENV HF_DATASETS_OFFLINE=1
+
 # VideoHelperSuite provides VHS_VideoCombine, which writes mp4s under node_output["gifs"].
 # LTXVideo plugin is kept in case future workflows want LTXVTiledVAEDecode etc.;
 # core ComfyUI already ships LTXVImgToVideo / LTXVConditioning / LTXVScheduler.
