@@ -1,4 +1,4 @@
-FROM runpod/worker-comfyui:5.8.5-base-cuda12.8.1
+FROM runpod/worker-comfyui:5.8.5-base
 
 # VideoHelperSuite provides VHS_VideoCombine, which writes mp4s under node_output["gifs"].
 # LTXVideo plugin is kept in case future workflows want LTXVTiledVAEDecode etc.;
