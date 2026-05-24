@@ -10,6 +10,16 @@ RUN git clone --depth 1 https://github.com/Lightricks/ComfyUI-LTXVideo /comfyui/
  && pip install --no-cache-dir -r /comfyui/custom_nodes/ComfyUI-VideoHelperSuite/requirements.txt \
  && pip install --no-cache-dir -r /comfyui/custom_nodes/ComfyUI-IPAdapter-Flux/requirements.txt
 
+# Build-time symlinks for IP-Adapter + CLIP-vision model dirs.
+# ComfyUI custom node looks at /comfyui/models/ipadapter-flux + /comfyui/models/clip_vision
+# but storyforge install_ipadapter.py downloads to /workspace/models/ (network volume).
+# Dangling at build, resolve at runtime when volume mounts. More reliable
+# than pre_start.sh (base image start.sh may not invoke it consistently).
+RUN ln -sfn /workspace/models/ipadapter-flux /comfyui/models/ipadapter-flux \
+ && ln -sfn /workspace/models/clip_vision /comfyui/models/clip_vision \
+ && echo "=== symlinks created at build ===" \
+ && ls -la /comfyui/models/ipadapter-flux /comfyui/models/clip_vision || true
+
 # Patch worker-comfyui handler.py to alias node_output["gifs"] → node_output["images"]
 # so VHS_VideoCombine mp4 outputs surface in the response. Upstream PR #133 covers
 # the same fix; this is an idempotent in-place edit until that lands.
