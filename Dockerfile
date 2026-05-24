@@ -62,10 +62,10 @@ fi\n\
 # but storyforge install_ipadapter.py downloads to /workspace/models/...)\n\
 mkdir -p /workspace/models/ipadapter-flux /workspace/models/clip_vision\n\
 for DIR in ipadapter-flux clip_vision; do\n\
-  TARGET=/comfyui/models/\n\
-  if [ ! -L "" ]; then\n\
-    rm -rf "" 2>/dev/null\n\
-    ln -sfn /workspace/models/ ""\n\
-    echo "[pre_start] linked  -> /workspace/models/"\n\
+  TARGET=/comfyui/models/${DIR}\n\
+  if [ ! -L "${TARGET}" ]; then\n\
+    rm -rf "${TARGET}" 2>/dev/null\n\
+    ln -sfn /workspace/models/${DIR} "${TARGET}"\n\
+    echo "[pre_start] linked ${TARGET} -> /workspace/models/${DIR}"\n\
   fi\n\
 done\n' > /pre_start.sh && chmod +x /pre_start.sh
