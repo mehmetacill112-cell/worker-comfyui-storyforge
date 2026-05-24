@@ -36,6 +36,24 @@ RUN echo "=== Final symlinks + yaml state ===" \
  && echo "---" \
  && cat /comfyui/extra_model_paths.yaml
 
+# PR #107 compat patch — ComfyUI v0.14+ removed flipped_img_txt direct access on
+# FLUX DoubleStreamBlock. Custom node ComfyUI-IPAdapter-Flux v.latest still uses
+# direct .flipped_img_txt access in flux/layers.py:30, causing AttributeError
+# during workflow execution (Vertex QA smoke 2026-05-24 18:29 UTC).
+# PR #107 fix uses getattr() with default False. Apply here as inline sed/python
+# patch until upstream merges (PRs #103/#105/#106/#107/#108 all open).
+RUN python3 - <<'PYEOF'
+import pathlib
+p = pathlib.Path("/comfyui/custom_nodes/ComfyUI-IPAdapter-Flux/flux/layers.py")
+s = p.read_text()
+old = "self.flipped_img_txt = original_block.flipped_img_txt"
+new = "self.flipped_img_txt = getattr(original_block, 'flipped_img_txt', False)  # storyforge PR#107 compat"
+if old not in s:
+    raise SystemExit("PR#107 patch anchor 'self.flipped_img_txt = original_block.flipped_img_txt' not found in flux/layers.py — upstream may have already fixed")
+p.write_text(s.replace(old, new, 1))
+print("PR#107 flipped_img_txt compat patch applied to flux/layers.py")
+PYEOF
+
 # Patch worker-comfyui handler.py to alias node_output["gifs"] → node_output["images"]
 # so VHS_VideoCombine mp4 outputs surface in the response. Upstream PR #133 covers
 # the same fix; this is an idempotent in-place edit until that lands.
