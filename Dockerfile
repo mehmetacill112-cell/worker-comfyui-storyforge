@@ -44,14 +44,40 @@ RUN echo "=== Final symlinks + yaml state ===" \
 # patch until upstream merges (PRs #103/#105/#106/#107/#108 all open).
 RUN python3 - <<'PYEOF'
 import pathlib
-p = pathlib.Path("/comfyui/custom_nodes/ComfyUI-IPAdapter-Flux/flux/layers.py")
-s = p.read_text()
-old = "self.flipped_img_txt = original_block.flipped_img_txt"
-new = "self.flipped_img_txt = getattr(original_block, 'flipped_img_txt', False)  # storyforge PR#107 compat"
-if old not in s:
-    raise SystemExit("PR#107 patch anchor 'self.flipped_img_txt = original_block.flipped_img_txt' not found in flux/layers.py — upstream may have already fixed")
-p.write_text(s.replace(old, new, 1))
-print("PR#107 flipped_img_txt compat patch applied to flux/layers.py")
+
+# ─── Patch 1: flux/layers.py — flipped_img_txt getattr (PR #107) ───
+p1 = pathlib.Path("/comfyui/custom_nodes/ComfyUI-IPAdapter-Flux/flux/layers.py")
+s1 = p1.read_text()
+old1 = "self.flipped_img_txt = original_block.flipped_img_txt"
+new1 = "self.flipped_img_txt = getattr(original_block, 'flipped_img_txt', False)  # storyforge PR#107 compat"
+if old1 not in s1:
+    raise SystemExit("PR#107 patch anchor not found in flux/layers.py")
+p1.write_text(s1.replace(old1, new1, 1))
+print("PR#107 flipped_img_txt compat applied to flux/layers.py")
+
+# ─── Patch 2: utils.py — forward_orig_ipa signature (PR #108) ───
+# ComfyUI v0.14+ passes timestep_zero_index + other kwargs that the custom
+# node's forward_orig_ipa didn't accept. Add them + **kwargs catch-all.
+p2 = pathlib.Path("/comfyui/custom_nodes/ComfyUI-IPAdapter-Flux/utils.py")
+s2 = p2.read_text()
+old2 = """    y: Tensor,
+    guidance: Tensor|None = None,
+    control=None,
+    transformer_options={},
+    attn_mask: Tensor = None,
+) -> Tensor:"""
+new2 = """    y: Tensor,
+    guidance: Tensor|None = None,
+    control=None,
+    timestep_zero_index=None,  # storyforge PR#108 ComfyUI v0.14+ compat
+    transformer_options={},
+    attn_mask: Tensor = None,
+    **kwargs,  # storyforge PR#108 catch-all for future ComfyUI API changes
+) -> Tensor:"""
+if old2 not in s2:
+    raise SystemExit("PR#108 patch anchor not found in utils.py")
+p2.write_text(s2.replace(old2, new2, 1))
+print("PR#108 forward_orig_ipa signature patch applied to utils.py")
 PYEOF
 
 # Patch worker-comfyui handler.py to alias node_output["gifs"] → node_output["images"]
